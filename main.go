@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"golang.org/x/net/html"
 	"io"
 	"net/http"
@@ -13,15 +14,15 @@ func main() {
 	p := &proxy{}
 	http.HandleFunc("/", p.Handler)
 
-	// Get the port from the PORT environment variable (required by Render)
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Fallback to 8080 for local testing
+		port = "8080" // Fallback for local testing
 	}
 
-	// Listen on the assigned port
+	fmt.Printf("Starting proxy on port %s...\n", port)
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
+		fmt.Printf("Failed to start server: %v\n", err)
 		panic(err)
 	}
 }
@@ -31,7 +32,7 @@ type proxy struct{}
 func (p *proxy) Handler(w http.ResponseWriter, r *http.Request) {
 	targetURL := "https://www.aezenai.com" + r.URL.Path
 	if r.URL.RawQuery != "" {
-		targetURL += "?" + r.URL.RawQuery // Preserve query parameters if present
+		targetURL += "?" + r.URL.RawQuery
 	}
 
 	resp, err := http.Get(targetURL)
@@ -41,18 +42,15 @@ func (p *proxy) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// Copy all headers from the target response to the client
 	for key, values := range resp.Header {
 		for _, value := range values {
 			w.Header().Add(key, value)
 		}
 	}
 
-	// Set Content-Type explicitly for non-HTML content (e.g., images)
 	contentType := resp.Header.Get("Content-Type")
 	w.Header().Set("Content-Type", contentType)
 
-	// If it's not an HTML page (e.g., images, JS, CSS), serve it directly
 	if !strings.Contains(contentType, "text/html") {
 		w.WriteHeader(resp.StatusCode)
 		_, err := io.Copy(w, resp.Body)
@@ -62,7 +60,6 @@ func (p *proxy) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For HTML pages, modify and inject JavaScript
 	modifiedHTML := p.injectJS(resp.Body)
 	w.WriteHeader(resp.StatusCode)
 	_, err = w.Write(modifiedHTML)
@@ -71,7 +68,6 @@ func (p *proxy) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// injectJS injects JavaScript to remove unwanted elements and disable right-click
 func (p *proxy) injectJS(body io.Reader) []byte {
 	doc, err := html.Parse(body)
 	if err != nil {
@@ -88,7 +84,6 @@ func (p *proxy) injectJS(body io.Reader) []byte {
 	return buf.Bytes()
 }
 
-// injectScript adds a JavaScript snippet to remove elements and disable right-click
 func injectScript(n *html.Node) {
 	if n.Type == html.ElementNode && n.Data == "body" {
 		script := &html.Node{
@@ -106,8 +101,8 @@ function removeUnwantedElements() {
     let divsToRemove = Array.from(document.querySelectorAll('div')).filter(div => divTextsToRemove.includes(div.textContent.trim()));
     divsToRemove.forEach(div => div.remove());
 
-    // Remove <div class="AuthLayout_left__mnQq_ flex-1"> containing infinite scroll
-    let authLayoutDiv = document.querySelector('div.AuthLayout_left__mnQq_.flex-1');
+    // Remove <div class="AuthLayout_left_mnQq flex-1"> containing infinite scroll
+    let authLayoutDiv = document.querySelector('div.AuthLayout_left_mnQq.flex-1');
     if (authLayoutDiv) authLayoutDiv.remove();
 
     // Remove <div> with watermark toggle
@@ -131,11 +126,15 @@ function removeUnwantedElements() {
     let hrefsToRemove = [
         "https://drive.google.com/file/d/1ulFvSQUYmfXNCulWC76_HEbync67tAYH/view?usp=sharing",
         "https://drive.google.com/file/d/1Lnnm5vppjx27QayOn-7eMcGlnal52tv3/view?usp=sharing",
-        "/workspaces/7368da06-9cc6-4e7c-82f8-207da38b5e12/bots/af2a896a-5517-48eb-b8f3-014eec338f38?t=platform-integration"
+        "/workspaces/7368da06-9cc6-4e7c-82f8-207da38b5e12/bots/af2a896a-5517-48eb-b8f3-014eec338f38?t=platform-integration",
+        "/user-settings?workspace_id=7368da06-9cc6-4e7c-82f8-207da38b5e12&t=referral"
     ];
     hrefsToRemove.forEach(href => {
         let aToRemove = document.querySelector('a[href="' + href + '"]');
-        if (aToRemove) aToRemove.remove();
+        if (aToRemove) {
+            console.log("Found <a> with href " + href + ", removing:", aToRemove);
+            aToRemove.remove();
+        }
     });
 
     // Remove <button> that contains a <span> with specific texts
@@ -148,29 +147,107 @@ function removeUnwantedElements() {
     // Remove <button> with trash icon
     let trashButtons = Array.from(document.querySelectorAll('button')).filter(button => button.querySelector('span.icon-trash'));
     trashButtons.forEach(button => button.remove());
+
+    // Remove <div class="ChatButton_get_started_button__h0pJh react-draggable">
+    let chatButtonDiv = document.querySelector('div.ChatButton_get_started_button__h0pJh.react-draggable');
+    if (chatButtonDiv) chatButtonDiv.remove();
+
+    // Remove <h2> with "Application error: a client-side exception has occurred"
+    let errorH2 = Array.from(document.querySelectorAll('h2')).find(h2 => h2.textContent.includes("Application error: a client-side exception has occurred"));
+    if (errorH2) errorH2.remove();
+
+    // Remove <div class="Text_text__0_Dq5 Text_title_2__yppuO text-center max-w-[200px]" with text "cxgenie_works_best_on_desktop_version">
+    let cxGenieDivs = document.querySelectorAll('div.Text_text__0_Dq5.Text_title_2__yppuO.text-center.max-w-\\[200px\\]');
+    Array.from(cxGenieDivs).forEach(div => {
+        if (div.textContent.trim().includes("cxgenie_works_best_on_desktop_version")) {
+            console.log("Found cxgenie_works_best_on_desktop_version div, removing:", div);
+            div.remove();
+        } else {
+            console.log("Found div with class Text_text__0_Dq5 Text_title_2__yppuO text-center max-w-[200px] but text does not match:", div.textContent.trim());
+        }
+    });
+
+    // Remove <div class="Sidebar_trained_data__LCzjK">
+    let sidebarTrainedDataDivs = document.querySelectorAll('div.Sidebar_trained_data__LCzjK');
+    sidebarTrainedDataDivs.forEach(div => {
+        console.log("Found Sidebar_trained_data__LCzjK div, removing:", div);
+        div.remove();
+    });
+
+    // Remove <div class="h-[38px] flex items-center justify-between px-3" data-sentry-component="ReferralCode">
+    let referralCodeDivs = document.querySelectorAll('div.h-\\[38px\\].flex.items-center.justify-between.px-3[data-sentry-component="ReferralCode"]');
+    referralCodeDivs.forEach(div => {
+        console.log("Found ReferralCode div, removing:", div);
+        div.remove();
+    });
+
+    // Remove all <div data-node-key="referral" class="cxg-tabs-tab">
+    let referralTabDivs = document.querySelectorAll('div[data-node-key="referral"].cxg-tabs-tab');
+    referralTabDivs.forEach(div => {
+        console.log("Found referral tab div, removing:", div);
+        div.remove();
+    });
+
+    // Remove <div class="flex items-center gap-2"> containing "Referral" and a span with class "icon-share"
+    let referralIconDivs = Array.from(document.querySelectorAll('div.flex.items-center.gap-2')).filter(div => {
+        return div.textContent.includes("Referral") && div.querySelector('span.icon-share');
+    });
+    referralIconDivs.forEach(div => {
+        console.log("Found div with class flex items-center gap-2 containing Referral and icon-share, removing:", div);
+        div.remove();
+    });
 }
+
+// Function to check for error in title and add reload button
+function checkForErrorAndAddButton() {
+    const title = document.title;
+    if (title.includes("Application error: a client-side exception has occurred")) {
+        if (!document.getElementById('reload-button')) {
+            const button = document.createElement('button');
+            button.id = 'reload-button';
+            button.textContent = 'Please RELOAD THE PAGE, server-side error';
+            button.style.position = 'fixed';
+            button.style.top = '50%';
+            button.style.left = '50%';
+            button.style.transform = 'translate(-50%, -50%)';
+            button.style.zIndex = '1000';
+            button.style.padding = '10px 20px';
+            button.style.fontSize = '16px';
+            button.style.cursor = 'pointer';
+            button.addEventListener('click', () => {
+                window.location.href = 'https://portal-aezenai.onrender.com/';
+            });
+            document.body.appendChild(button);
+        }
+    }
+}
+
+// Disable right-click (context menu) on the entire page
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    console.log("Right-click disabled");
+});
 
 // Run initially
 removeUnwantedElements();
+checkForErrorAndAddButton();
 
-// MutationObserver to detect new elements
-const observer = new MutationObserver(() => removeUnwantedElements());
-observer.observe(document.body, { childList: true, subtree: true });
+// MutationObserver to detect new elements in body
+const bodyObserver = new MutationObserver(() => removeUnwantedElements());
+bodyObserver.observe(document.body, { childList: true, subtree: true });
 
-// Fallback interval for extra reliability
+// MutationObserver to detect changes in head (for title updates)
+const headObserver = new MutationObserver(() => checkForErrorAndAddButton());
+headObserver.observe(document.head, { childList: true, subtree: true });
+
+// Fallback interval for extra reliability on element removal
 setInterval(removeUnwantedElements, 100);
-
-// Disable right-click (context menu)
-document.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
-});
 				`,
 			},
 		}
 		n.AppendChild(script)
 	}
 
-	// Recursively apply to all child nodes
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		injectScript(c)
 	}
