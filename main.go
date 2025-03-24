@@ -101,9 +101,22 @@ function removeUnwantedElements() {
     let divsToRemove = Array.from(document.querySelectorAll('div')).filter(div => divTextsToRemove.includes(div.textContent.trim()));
     divsToRemove.forEach(div => div.remove());
 
-    // Remove <div class="AuthLayout_left_mnQq flex-1"> containing infinite scroll
-    let authLayoutDiv = document.querySelector('div.AuthLayout_left_mnQq.flex-1');
-    if (authLayoutDiv) authLayoutDiv.remove();
+    // Enhanced removal of <div class="AuthLayout_left__mnQq_ flex-1">
+    let authLayoutDivs = document.querySelectorAll('div[class*="AuthLayout_left__"][class*="flex-1"]');
+    authLayoutDivs.forEach(div => {
+        if (div.className.includes("AuthLayout_left__") && div.className.includes("flex-1")) {
+            div.remove();
+        }
+    });
+
+    // Remove <div class="Text_text__0_Dq5 Text_title_2__yppuO"> when it contains "Referral"
+    let referralTextDivs = document.querySelectorAll('div.Text_text__0_Dq5.Text_title_2__yppuO');
+    referralTextDivs.forEach(div => {
+        if (div.textContent.trim() === "Referral") {
+            console.log("Found Text_text__0_Dq5 Text_title_2__yppuO div with 'Referral', removing:", div);
+            div.remove();
+        }
+    });
 
     // Remove <div> with watermark toggle
     let watermarkDivToRemove = Array.from(document.querySelectorAll('div')).find(div => {
@@ -127,7 +140,8 @@ function removeUnwantedElements() {
         "https://drive.google.com/file/d/1ulFvSQUYmfXNCulWC76_HEbync67tAYH/view?usp=sharing",
         "https://drive.google.com/file/d/1Lnnm5vppjx27QayOn-7eMcGlnal52tv3/view?usp=sharing",
         "/workspaces/7368da06-9cc6-4e7c-82f8-207da38b5e12/bots/af2a896a-5517-48eb-b8f3-014eec338f38?t=platform-integration",
-        "/user-settings?workspace_id=7368da06-9cc6-4e7c-82f8-207da38b5e12&t=referral"
+        "/user-settings?workspace_id=7368da06-9cc6-4e7c-82f8-207da38b5e12&t=referral",
+        "https://drive.google.com/file/d/1ZOdQl4HIhsOGyV7X5urKUh8kNdUuh8k4/view"
     ];
     hrefsToRemove.forEach(href => {
         let aToRemove = document.querySelector('a[href="' + href + '"]');
@@ -135,6 +149,13 @@ function removeUnwantedElements() {
             console.log("Found <a> with href " + href + ", removing:", aToRemove);
             aToRemove.remove();
         }
+    });
+
+    // Remove <span> with class "icon-message-question"
+    let messageQuestionSpans = document.querySelectorAll('span.icon-message-question');
+    messageQuestionSpans.forEach(span => {
+        console.log("Found span with class icon-message-question, removing:", span);
+        span.remove();
     });
 
     // Remove <button> that contains a <span> with specific texts
@@ -162,8 +183,6 @@ function removeUnwantedElements() {
         if (div.textContent.trim().includes("cxgenie_works_best_on_desktop_version")) {
             console.log("Found cxgenie_works_best_on_desktop_version div, removing:", div);
             div.remove();
-        } else {
-            console.log("Found div with class Text_text__0_Dq5 Text_title_2__yppuO text-center max-w-[200px] but text does not match:", div.textContent.trim());
         }
     });
 
@@ -202,10 +221,14 @@ function removeUnwantedElements() {
 function checkForErrorAndAddButton() {
     const title = document.title;
     if (title.includes("Application error: a client-side exception has occurred")) {
+        // Make whole screen white
+        document.body.style.backgroundColor = 'white';
+        document.body.innerHTML = ''; // Clear existing content
+
         if (!document.getElementById('reload-button')) {
             const button = document.createElement('button');
             button.id = 'reload-button';
-            button.textContent = 'Please RELOAD THE PAGE, server-side error';
+            button.textContent = 'Return Back';
             button.style.position = 'fixed';
             button.style.top = '50%';
             button.style.left = '50%';
@@ -214,6 +237,10 @@ function checkForErrorAndAddButton() {
             button.style.padding = '10px 20px';
             button.style.fontSize = '16px';
             button.style.cursor = 'pointer';
+            button.style.backgroundColor = '#007bff'; // Blue background
+            button.style.color = 'white'; // White text
+            button.style.border = 'none';
+            button.style.borderRadius = '4px';
             button.addEventListener('click', () => {
                 window.location.href = 'https://portal-aezenai.onrender.com/';
             });
@@ -221,12 +248,6 @@ function checkForErrorAndAddButton() {
         }
     }
 }
-
-// Disable right-click (context menu) on the entire page
-document.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
-    console.log("Right-click disabled");
-});
 
 // Run initially
 removeUnwantedElements();
