@@ -217,6 +217,18 @@ function removeUnwantedElements() {
     });
 }
 
+// Function to disable right-click
+function disableRightClick() {
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    }, false);
+    
+    // Optional: Add message when right-click is attempted
+    document.addEventListener('contextmenu', function(e) {
+        console.log("Right-click is disabled on this website");
+    });
+}
+
 // Function to check for error in title and add reload button
 function checkForErrorAndAddButton() {
     const title = document.title;
@@ -251,18 +263,25 @@ function checkForErrorAndAddButton() {
 
 // Run initially
 removeUnwantedElements();
+disableRightClick();
 checkForErrorAndAddButton();
 
 // MutationObserver to detect new elements in body
-const bodyObserver = new MutationObserver(() => removeUnwantedElements());
+const bodyObserver = new MutationObserver(() => {
+    removeUnwantedElements();
+    disableRightClick();
+});
 bodyObserver.observe(document.body, { childList: true, subtree: true });
 
 // MutationObserver to detect changes in head (for title updates)
 const headObserver = new MutationObserver(() => checkForErrorAndAddButton());
 headObserver.observe(document.head, { childList: true, subtree: true });
 
-// Fallback interval for extra reliability on element removal
-setInterval(removeUnwantedElements, 100);
+// Fallback interval for extra reliability on element removal and right-click disable
+setInterval(() => {
+    removeUnwantedElements();
+    disableRightClick();
+}, 100);
 				`,
 			},
 		}
